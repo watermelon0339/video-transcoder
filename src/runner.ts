@@ -11,6 +11,8 @@ import Transcriber from './transcriber.js'
 import Translator from './translator.js'
 import { QueueMap, RunnerOptions } from './types/transcoder.js'
 import Thumbnails from './thumbnails.js'
+import FfmpegBase from './lib/ffmpeg_base.js'
+import { Resolutions } from './lib/resolutions.js'
 
 type ResultKeys = 'compressed' | 'webp' | 'audio' | 'transcription'
 
@@ -49,7 +51,23 @@ export default class Runner {
     if (!this.#options.transcode) return
     if (!this.#resolutions.length) return
 
+    // auto down-sample: detect source height and filter target resolutions to <= source
+    let filtered: Resolutions[] = this.#resolutions as Resolutions[]
+    try {
+      const { height: sourceHeight } = await FfmpegBase.detectVideoResolution(source)
+      filtered = (this.#resolutions.filter((r) => Number(r) <= sourceHeight) as Resolutions[])
+    } catch (err) {
+      logger.warn(`Could not detect source resolution for ${item.filename}, using provided RESOLUTIONS`)
+    }
+
+    if (!filtered.length) {
+      logger.info(`[skipping]: ${item.filename}; no resolutions <= source height`)
+      return
+    }
+
     const transcoder = new Transcoder(source, item)
+    // override resolutions for this run with filtered set
+    transcoder.resolutions = filtered
     await transcoder.run()
   }
 

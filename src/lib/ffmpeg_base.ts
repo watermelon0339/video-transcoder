@@ -32,4 +32,24 @@ export default abstract class FfmpegBase {
       })
     })
   }
+
+  static async detectVideoResolution(
+    path: string
+  ): Promise<{ width: number; height: number }> {
+    return new Promise((resolve, reject) => {
+      ffmpeg(decodeURI(path)).ffprobe((err, data) => {
+        if (err) {
+          return reject(err)
+        }
+
+        const { width, height } = data.streams.find((stream) => stream.codec_type === 'video') ?? {}
+
+        if (!width || !height) {
+          return reject(new Error('Could not detect video resolution'))
+        }
+
+        resolve({ width, height })
+      })
+    })
+  }
 }
