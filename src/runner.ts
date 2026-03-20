@@ -39,35 +39,25 @@ export default class Runner {
       // create destination folder path
       await mkdir(item.destination, { recursive: true })
 
-      await this.#transcode(source, item)
+      const filteredResolutions = await this.#autoDetectResolutions(source, item)
+      if (!filteredResolutions.length) {
+        continue
+      }
+      await this.#transcode(source, item, filteredResolutions)
       await this.#thumbnails(source, item)
-      await this.#compress(source, item)
+      await this.#compress(source, item, filteredResolutions)
       await this.#webp(source, item)
       await this.#transcribe(source, item)
     }
   }
 
-  async #transcode(source: string, item: QueuedFile) {
+  async #transcode(source: string, item: QueuedFile, overrideResolutions?: Resolutions[]) {
     if (!this.#options.transcode) return
     if (!this.#resolutions.length) return
 
-    // auto down-sample: detect source height and filter target resolutions to <= source
-    let filtered: Resolutions[] = this.#resolutions as Resolutions[]
-    try {
-      const { height: sourceHeight } = await FfmpegBase.detectVideoResolution(source)
-      filtered = (this.#resolutions.filter((r) => Number(r) <= sourceHeight) as Resolutions[])
-    } catch (err) {
-      logger.warn(`Could not detect source resolution for ${item.filename}, using provided RESOLUTIONS`)
-    }
-
-    if (!filtered.length) {
-      logger.info(`[skipping]: ${item.filename}; no resolutions <= source height`)
-      return
-    }
-
     const transcoder = new Transcoder(source, item)
     // override resolutions for this run with filtered set
-    transcoder.resolutions = filtered
+    overrideResolutions && (transcoder.resolutions = overrideResolutions)
     await transcoder.run()
   }
 
@@ -76,10 +66,11 @@ export default class Runner {
     await thumbnails.run()
   }
 
-  async #compress(source: string, item: QueuedFile) {
+  async #compress(source: string, item: QueuedFile, overrideResolutions?: Resolutions[]) {
     if (!this.#options.includeMp4) return
 
     const compressor = new Compressor(source, item)
+    overrideResolutions && (compressor.resolutions = overrideResolutions)
     const compressed = await compressor.run()
 
     this.results.set('compressed', compressed)
@@ -131,5 +122,22 @@ export default class Runner {
   #getAudioGenerator(source: string, item: QueuedFile) {
     const path = this.results.get('compressed') ?? source
     return new GenerateAudio(path, item)
+  }
+
+  async #autoDetectResolutions(source: string, item: QueuedFile): Promise<Resolutions[]> {
+    // auto down-sample: detect source height and filter target resolutions to <= source
+    let filtered: Resolutions[] = this.#resolutions as Resolutions[]
+    try {
+      const { height: sourceHeight } = await FfmpegBase.detectVideoResolution(source)
+      filtered = (this.#resolutions.filter((r) => Number(r) <= sourceHeight) as Resolutions[])
+    } catch (err) {
+      logger.warn(`Could not detect source resolution for ${item.filename}, using provided RESOLUTIONS`)
+    }
+
+    if (!filtered.length) {
+      logger.info(`[skipping]: ${item.filename}; no resolutions <= source height`)
+      return []
+    }
+    return filtered
   }
 }

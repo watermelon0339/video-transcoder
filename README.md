@@ -64,3 +64,23 @@ The following dependencies need to be installed and accessible via their CLI com
 - [x] Generate transcription from video
 - [x] Translate video transcription to Spanish and French
 - [ ] Upload generated files to Cloudflare R2 (not doing for now, prefer to review before uploading)
+
+### 用法
+
+```bash
+# 1️⃣首次安装依赖
+npm install
+
+# 2️⃣构建本地转码运行时，构建之后的文件存放于 build 目录
+npm build
+
+# 3️⃣拷贝转码配置文件到 build 目录
+cp .env.example build/.env
+
+# 4️⃣ 修改配置，尤其是 SOURCE_LOCATION OUTPUT_LOCATION RESOLUTIONS 这3个
+# 为了节省流量，建议设置RESOLUTIONS=480或720,480
+
+# 5️⃣转码：把存放在 SOURCE_LOCATION 里的视频，全部转码到 OUTPUT_LOCATION 目录
+cd build
+node ace run:transcoder
+```
