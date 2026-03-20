@@ -70,6 +70,9 @@ The following dependencies need to be installed and accessible via their CLI com
 ```bash
 # 1️⃣首次安装依赖
 npm install
+sudo apt update
+sudo apt install ffmpeg # 依赖在本地可以使用 CLI 操作 ffmpeg
+# 如果需要识别字幕，还需要在本地安装 Faster Whisper: https://github.com/SYSTRAN/faster-whisper
 
 # 2️⃣构建本地转码运行时，构建之后的文件存放于 build 目录
 npm build
