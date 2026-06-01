@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import Progress from './lib/progress.js'
 import QueuedFile from './lib/queued_file.js'
+import { resolveFfmpegBackend } from './lib/gpu_resolver.js'
 
 export default class Transcriber {
   declare source: string
@@ -24,6 +25,11 @@ export default class Transcriber {
 
   async #transcribe(): Promise<string | null> {
     return new Promise((resolve) => {
+      const forceCpu = env.get('FORCE_CPU_DEVICE') ?? false
+      const resolvedBackend = resolveFfmpegBackend()
+      const device = forceCpu ? 'cpu' : (resolvedBackend.backend === 'nvidia' ? 'cuda' : 'cpu')
+      logger.info(`[device]: ${device}`)
+
       // 👇 location of faster-whisper python isolation `pipx install faster-whisper`
       const command = env.get('PYTHON_FASTER_WHISPER')
       const whisperArgs = [
@@ -31,26 +37,37 @@ export default class Transcriber {
         `"${this.source}"`,
         `"${this.item.destination}"`,
         'large-v3',
+        device,
       ]
 
       const progress = new Progress('Transcribing')
+      const stderrChunks: string[] = []
+      const stdoutChunks: string[] = []
 
       progress.start()
 
-      const whisperProcess = spawn(command, whisperArgs, { shell: true })
+      const whisperProcess = spawn(command, whisperArgs, {
+        shell: true,
+        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      })
 
       // capture stdout data in real-time
       whisperProcess.stdout.on('data', (data) => {
-        logger.debug('[stdout] ' + data.toString())
+        const chunk = data.toString()
+        stdoutChunks.push(chunk)
+        logger.debug('[stdout] ' + chunk)
       })
 
       // capture stderr data in real-time
       whisperProcess.stderr.on('data', (data) => {
-        if (data.includes('%')) {
-          const percent = Number(data.toString().split('|').at(0).replace('%', '').trim())
+        const chunk = data.toString()
+        stderrChunks.push(chunk)
+
+        if (chunk.includes('%')) {
+          const percent = Number(chunk.split('|').at(0)?.replace('%', '').trim())
           progress.update(percent)
         }
-        logger.debug(data.toString())
+        logger.error('[whisper stderr] ' + chunk.trim())
       })
 
       // `spawn` emits a 'close' event when the process finishes
@@ -58,6 +75,18 @@ export default class Transcriber {
         progress.update(100)
 
         if (code !== 0) {
+          if (stderrChunks.length > 0) {
+            const stderrTail = stderrChunks.join('').split('\n').slice(-20).join('\n').trim()
+            if (stderrTail.length > 0) {
+              logger.error('[error]: Whisper stderr tail:\n' + stderrTail)
+            }
+          }
+          if (stdoutChunks.length > 0) {
+            const stdoutTail = stdoutChunks.join('').split('\n').slice(-10).join('\n').trim()
+            if (stdoutTail.length > 0) {
+              logger.error('[error]: Whisper stdout tail:\n' + stdoutTail)
+            }
+          }
           logger.error(`[error]: Whisper process exited with code ${code}. Transcription failed.`)
           resolve(null)
           return
@@ -79,12 +108,12 @@ export default class Transcriber {
   }
 
   async #transcribeCleanUp(): Promise<string | null> {
-    await this.#transcribeApplyReplacements('en.srt')
-    await this.#transcribeApplyReplacements(`en.txt`)
+    await this.#transcribeApplyReplacements('zh.srt')
+    await this.#transcribeApplyReplacements(`zh.txt`)
 
     logger.info(`[completed]: post-processing and clean up`)
 
-    return `${this.item.destination}/en.srt`
+    return `${this.item.destination}/zh.srt`
   }
 
   async #transcribeApplyReplacements(filename: string) {
@@ -98,7 +127,7 @@ export default class Transcriber {
 
       await writeFile(`${this.item.destination}/${filename}`, fileContent, 'utf8')
     } catch (error) {
-      logger.error(`[error]: Failed to apply replacements. Error: ${error.message}`)
+      logger.error(`[error]: Failed to apply replacements. Error: ${(error as Error).message}`)
     }
   }
 }

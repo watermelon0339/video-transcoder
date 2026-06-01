@@ -21,6 +21,8 @@ export default await Env.create(new URL('../', import.meta.url), {
   // transcoder options
   SOURCE_LOCATION: Env.schema.string(),
   OUTPUT_LOCATION: Env.schema.string(),
+  GPU: Env.schema.enum(['auto', 'cpu', 'nvidia', 'amd', 'apple-m', 'apple-intel'] as const),
+  FORCE_CPU_DEVICE: Env.schema.boolean.optional(),
   PYTHON_FASTER_WHISPER: Env.schema.string(),
   USE_UNIQUE_NAME: Env.schema.boolean(),
   INCLUDE_MP4: Env.schema.boolean(),

@@ -2,6 +2,7 @@ import { InvalidArgumentsException } from '@adonisjs/core/exceptions'
 import logger from '@adonisjs/core/services/logger'
 import { mkdir, writeFile } from 'node:fs/promises'
 import FfmpegBase from './lib/ffmpeg_base.js'
+import { resolveFfmpegBackend } from './lib/gpu_resolver.js'
 import Progress from './lib/progress.js'
 import QueuedFile from './lib/queued_file.js'
 import { resolutions, Resolutions } from './lib/resolutions.js'
@@ -58,25 +59,46 @@ export default class Transcoder extends FfmpegBase {
 
     return new Promise((resolve) => {
       const progress = new Progress(resolutionName)
+      const resolvedBackend = resolveFfmpegBackend()
+
+      const outputOptions = [
+        '-hls_time',
+        '6',
+        '-hls_playlist_type',
+        'vod',
+        '-hls_segment_filename',
+        outputSegment,
+      ]
+
+      if (resolvedBackend.backend === 'cpu') {
+        outputOptions.unshift('-crf', '25', '-preset', 'fast', '-filter:v', `scale=-2:${height}`)
+      }
+
+      if (resolvedBackend.backend === 'nvidia') {
+        outputOptions.unshift('-cq', '25', '-preset', 'p4', '-filter:v', `scale=-2:${height}`)
+      }
+
+      if (resolvedBackend.backend === 'apple') {
+        outputOptions.unshift('-q:v', '70', '-filter:v', `scale=-2:${height}`)
+      }
+
+      if (resolvedBackend.backend === 'amd') {
+        outputOptions.unshift(
+          '-vf',
+          `format=nv12,hwupload,scale_vaapi=-2:${height}`,
+          '-rc_mode',
+          'VBR',
+          '-qp',
+          '24'
+        )
+      }
+
       const command = this.ffmpeg(this.source)
         .output(outputPlaylist)
-        .videoCodec('libx264')
+        .videoCodec(resolvedBackend.encoders.transcoder)
         .audioCodec('aac')
         .audioBitrate('148k')
-        .outputOptions([
-          '-filter:v',
-          `scale=-2:${height}`,
-          '-preset',
-          'fast',
-          '-crf',
-          '25',
-          '-hls_time',
-          '6',
-          '-hls_playlist_type',
-          'vod',
-          '-hls_segment_filename',
-          outputSegment,
-        ])
+        .outputOptions(outputOptions)
 
       progress.start()
 

@@ -56,6 +56,22 @@ The following dependencies need to be installed and accessible via their CLI com
 - [Faster Whisper (Python)](https://github.com/SYSTRAN/faster-whisper) - Used to generate a transcription of videos
 - [Argos Translate (Python)](https://github.com/argosopentech/argos-translate) - Used to translate the video transcriptions
 
+### GPU Mode
+
+The `GPU` env setting controls ffmpeg video pipelines only (HLS transcoding + MP4 compression).
+
+- `GPU=auto` chooses the best available backend and falls back to CPU if needed.
+- `GPU=cpu` forces software encoders (`libx264`/`libx265`).
+- `GPU=nvidia` prefers NVENC (`h264_nvenc`/`hevc_nvenc`).
+- `GPU=amd` prefers VAAPI (`h264_vaapi`/`hevc_vaapi`).
+- `GPU=apple-m` and `GPU=apple-intel` both resolve to VideoToolbox (`h264_videotoolbox`/`hevc_videotoolbox`).
+
+You can verify available ffmpeg hardware encoders with:
+
+```bash
+ffmpeg -encoders | grep -E 'nvenc|videotoolbox|vaapi'
+```
+
 ### Todos
 
 - [x] Include compressed video file (for downloading)
@@ -75,7 +91,7 @@ sudo apt install ffmpeg # 依赖在本地可以使用 CLI 操作 ffmpeg
 # 如果需要识别字幕，还需要在本地安装 Faster Whisper: https://github.com/SYSTRAN/faster-whisper
 
 # 2️⃣构建本地转码运行时，构建之后的文件存放于 build 目录
-npm build
+npm run build
 
 # 3️⃣拷贝转码配置文件到 build 目录
 cp .env.example build/.env
@@ -88,10 +104,13 @@ cd build
 node ace run:transcoder
 
 
-# 共享给同事
+# 共享给同事(video_transcoder.tar.gz)
 
-cp -R node_modules/* build/
+cp -R node_modules build/
 cp README_how.md faster_whisper_cli.py requirements.txt build/
-cd build
-tar czf ../video_transcoder.tar.gz .
+cp .env.example build/.env
+mv build video_transcoder
+tar czf video_transcoder.tar.gz video_transcoder
+mv video_transcoder build
+rm -rf build/node_modules
 ```

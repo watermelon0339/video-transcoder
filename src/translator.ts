@@ -6,15 +6,15 @@ import { readFile, writeFile } from 'node:fs/promises'
 import subsrt from 'subsrt-ts'
 import { ContentCaption } from 'subsrt-ts/dist/types/handler.js'
 
-type Caption = {
-  type: string
-  index: number
-  start: number
-  end: number
-  duration: number
-  content: string
-  text: string
-}
+// type Caption = {
+//   type: string
+//   index: number
+//   start: number
+//   end: number
+//   duration: number
+//   content: string
+//   text: string
+// }
 
 export default class Translator {
   #codes = env.get('TRANSCRIPTION_LANGS')?.split(',') ?? []
@@ -52,7 +52,7 @@ export default class Translator {
   async #translate(code: string, translatable: string): Promise<string> {
     return new Promise(async (resolve) => {
       exec(
-        `argos-translate --from-lang en --to-lang ${code} "${translatable}"`,
+        `argos-translate --from-lang zh --to-lang ${code} "${translatable}"`,
         (error, stdout) => {
           if (error) {
             logger.error(`[translation error]: ${code}: ${error.message}`)

@@ -37,7 +37,7 @@ export default class GenerateAudio extends FfmpegBase {
     await unlink(this.output)
   }
 
-  async #compress(): Promise<string> {
+  async #compress(): Promise<string | null> {
     return new Promise((resolve) => {
       const progress = new Progress('Audio Extraction')
       const command = this.ffmpeg(this.source).output(this.output).toFormat('mp3')

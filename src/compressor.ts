@@ -1,5 +1,6 @@
 import logger from '@adonisjs/core/services/logger'
 import FfmpegBase from './lib/ffmpeg_base.js'
+import { resolveFfmpegBackend } from './lib/gpu_resolver.js'
 import Progress from './lib/progress.js'
 import QueuedFile from './lib/queued_file.js'
 import { resolutions, Resolutions } from './lib/resolutions.js'
@@ -20,30 +21,54 @@ export default class Compressor extends FfmpegBase {
     return this.#compress()
   }
 
-  async #compress(): Promise<string> {
+  async #compress(): Promise<string | null> {
     const output = [this.item.destination, 'video.mp4'].join('/')
     const resolution = this.#getMaxResolution()
     const { height } = resolutions.get(resolution) ?? {}
 
     return new Promise((resolve) => {
       const progress = new Progress('Compressing')
-      const command = this.ffmpeg(this.source)
-        .output(output)
-        .videoCodec('libx265')
-        .audioCodec('aac')
-        .audioBitrate('148k')
-        .outputOptions([
-          '-filter:v',
-          `scale=-2:${height}`,
-          '-preset',
-          'fast',
-          '-crf',
-          '26',
-          '-tag:v',
-          'hvc1',
+      const resolvedBackend = resolveFfmpegBackend()
+      const outputOptions = ['-tag:v', 'hvc1']
+
+      if (resolvedBackend.backend === 'cpu') {
+        outputOptions.unshift(
           '-x265-params',
           'profile=main10',
-        ])
+          '-crf',
+          '26',
+          '-preset',
+          'fast',
+          '-filter:v',
+          `scale=-2:${height}`
+        )
+      }
+
+      if (resolvedBackend.backend === 'nvidia') {
+        outputOptions.unshift('-cq', '27', '-preset', 'p4', '-filter:v', `scale=-2:${height}`)
+      }
+
+      if (resolvedBackend.backend === 'apple') {
+        outputOptions.unshift('-q:v', '75', '-filter:v', `scale=-2:${height}`)
+      }
+
+      if (resolvedBackend.backend === 'amd') {
+        outputOptions.unshift(
+          '-vf',
+          `format=nv12,hwupload,scale_vaapi=-2:${height}`,
+          '-rc_mode',
+          'VBR',
+          '-qp',
+          '26'
+        )
+      }
+
+      const command = this.ffmpeg(this.source)
+        .output(output)
+        .videoCodec(resolvedBackend.encoders.compressor)
+        .audioCodec('aac')
+        .audioBitrate('148k')
+        .outputOptions(outputOptions)
 
       progress.start()
 
