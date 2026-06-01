@@ -31,13 +31,16 @@ audio_path = sys.argv[1].strip('\"')
 output_dir = sys.argv[2].strip('\"')
 model_size = sys.argv[3]
 
-# NOTE: Keeping device="cpu" as that was the fix for your environment
-model = WhisperModel(model_size, device="cpu", compute_type="int8")
+# NOTE:
+# 在 NVIDIA 显卡的电脑上，您可以将 device 设置为 "cuda" 以利用 GPU 加速。
+# (未测试) 在 macOS M系列芯片的电脑上，您可以将 device 设置为 "mps" 以利用 Apple Silicon 的加速功能。
+# 如果 cuda / mps 不可用，或者您希望在 CPU 上运行，则可以将 device 设置为 "cpu"。
+model = WhisperModel(model_size, device="cuda", compute_type="int8")
 
 # The result is a generator of segments
 segments, info = model.transcribe(
     audio_path,
-    language="en",
+    language="zh",
     word_timestamps=False
 )
 
@@ -48,8 +51,8 @@ os.makedirs(output_dir, exist_ok=True)
 
 # Get base filename for outputs
 audio_filename = os.path.splitext(os.path.basename(audio_path))[0]
-srt_output_path = os.path.join(output_dir, "en.srt")
-txt_output_path = os.path.join(output_dir, "en.txt")
+srt_output_path = os.path.join(output_dir, "zh.srt")
+txt_output_path = os.path.join(output_dir, "zh.txt")
 
 # Initialize a list to hold all text for the TXT file
 full_transcript_text = []

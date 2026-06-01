@@ -86,4 +86,12 @@ cp .env.example build/.env
 # 5️⃣转码：把存放在 SOURCE_LOCATION 里的视频，全部转码到 OUTPUT_LOCATION 目录
 cd build
 node ace run:transcoder
+
+
+# 共享给同事
+
+cp -R node_modules/* build/
+cp README_how.md faster_whisper_cli.py requirements.txt build/
+cd build
+tar czf ../video_transcoder.tar.gz .
 ```

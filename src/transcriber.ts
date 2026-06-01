@@ -30,7 +30,7 @@ export default class Transcriber {
         './faster_whisper_cli.py',
         `"${this.source}"`,
         `"${this.item.destination}"`,
-        'large-v2',
+        'large-v3',
       ]
 
       const progress = new Progress('Transcribing')

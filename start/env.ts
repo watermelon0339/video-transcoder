@@ -26,6 +26,6 @@ export default await Env.create(new URL('../', import.meta.url), {
   INCLUDE_MP4: Env.schema.boolean(),
   INCLUDE_WEBP: Env.schema.boolean(),
   INCLUDE_TRANSCRIPTION: Env.schema.boolean(),
-  TRANSCRIPTION_LANGS: Env.schema.string(),
+  TRANSCRIPTION_LANGS: Env.schema.string.optional(),
   RESOLUTIONS: Env.schema.string(),
 })
